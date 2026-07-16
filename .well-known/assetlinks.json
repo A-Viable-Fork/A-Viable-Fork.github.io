@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.aviablefork.knowledgegame",
+      "sha256_cert_fingerprints": [
+        "68:60:19:08:89:67:80:51:43:E5:9A:71:AE:45:1C:AB:A8:5F:88:D1:35:C8:6C:32:26:38:66:56:E0:EA:CB:15"
+      ]
+    }
+  }
+]
