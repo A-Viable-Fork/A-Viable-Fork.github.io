@@ -1,0 +1,175 @@
+/* Design register borrowed from the app's own token set (Knowledge-Game/app/style.css): calm,
+   typographic, the grade dot the only accent color. Dark mode follows prefers-color-scheme. */
+
+:root {
+  --paper: #f7f5f0;
+  --ink: #16181c;
+  --ink-muted: #55595f;
+  --line: #d8d4c8;
+  --card-bg: #ffffff;
+  --focus: #2f6df0;
+
+  --grade-ungraded: #9a9a94;
+  --grade-asserted: #8a8f98;
+  --grade-supported: #5f8fae;
+  --grade-corroborated: #3f7fae;
+  --grade-checked: #2c8a5f;
+  --grade-independently-rechecked: #1f6f4a;
+  --grade-constitutive: #6a4fae;
+
+  --radius: 14px;
+  --font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #12140f;
+    --ink: #f1efe8;
+    --ink-muted: #b7b3a6;
+    --line: #33362c;
+    --card-bg: #1b1e17;
+    --focus: #7aa2ff;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-family);
+}
+
+body {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+  line-height: 1.5;
+}
+
+a { color: inherit; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+header.entrance-header {
+  margin-bottom: 2.25rem;
+}
+header.entrance-header h1 {
+  font-size: 1.7rem;
+  margin: 0 0 0.4rem;
+}
+header.entrance-header p {
+  color: var(--ink-muted);
+  margin: 0;
+  font-size: 1rem;
+}
+
+main { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.door {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  padding: 1.4rem 1.5rem;
+}
+.door h2 {
+  font-size: 1.25rem;
+  margin: 0 0 0.15rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+.door .tagline {
+  color: var(--ink-muted);
+  margin: 0 0 0.9rem;
+}
+.door .fallback-note {
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+  margin: 0 0 0.9rem;
+}
+
+.status-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.status-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.92rem;
+}
+.status-list a {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.status-list a:hover .status-text { text-decoration: underline; }
+
+.grade-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  flex: none;
+  display: inline-block;
+  transform: translateY(-0.05rem);
+}
+.g-ungraded { background: var(--grade-ungraded); }
+.g-asserted { background: var(--grade-asserted); }
+.g-supported { background: var(--grade-supported); }
+.g-corroborated { background: var(--grade-corroborated); }
+.g-checked { background: var(--grade-checked); }
+.g-independently-rechecked { background: var(--grade-independently-rechecked); }
+.g-constitutive { background: var(--grade-constitutive); }
+
+.adopted-mark {
+  color: var(--grade-constitutive);
+  font-weight: 600;
+  font-size: 0.85em;
+}
+
+.door-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.door-links a {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+.door-links a:hover { border-color: var(--ink-muted); }
+
+section.readers {
+  border-top: 1px solid var(--line);
+  padding-top: 1.5rem;
+  margin-top: 0.5rem;
+}
+section.readers h2 { font-size: 1.05rem; margin: 0 0 0.8rem; }
+section.readers .path { margin-bottom: 0.9rem; }
+section.readers .path h3 { font-size: 0.95rem; margin: 0 0 0.2rem; }
+section.readers .path p { margin: 0; color: var(--ink-muted); font-size: 0.92rem; }
+section.readers .source-note { font-size: 0.78rem; color: var(--ink-muted); margin-top: 0.8rem; }
+
+section.direct-links {
+  border-top: 1px solid var(--line);
+  padding-top: 1.25rem;
+  margin-top: 0.5rem;
+}
+section.direct-links h2 { font-size: 1.05rem; margin: 0 0 0.7rem; }
+section.direct-links ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+section.direct-links a { font-size: 0.92rem; }
+
+.load-error {
+  font-size: 0.85rem;
+  color: var(--grade-asserted);
+}
