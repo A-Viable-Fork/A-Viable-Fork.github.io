@@ -65,19 +65,108 @@ header.entrance-header p {
   font-size: 1rem;
 }
 
-.start-here {
-  margin: 0 0 1.75rem;
+.primary-action {
+  margin: 0 0 1.5rem;
 }
-.start-here a {
+.primary-action a {
   display: inline-block;
+  background: var(--grade-constitutive);
+  color: var(--paper);
   border: 1px solid var(--grade-constitutive);
   border-radius: 999px;
-  padding: 0.55rem 1.1rem;
-  font-size: 0.95rem;
+  padding: 0.6rem 1.3rem;
+  font-size: 1rem;
+  font-weight: 600;
   text-decoration: none;
 }
-.start-here a:hover { background: color-mix(in srgb, var(--grade-constitutive) 10%, transparent); }
-.start-here strong { color: var(--grade-constitutive); }
+.primary-action a:hover { opacity: 0.9; }
+
+.branch-intro {
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+  margin: 0 0 1.1rem;
+}
+
+.questions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+details.question {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  padding: 0;
+}
+details.question > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 1rem 1.2rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.5rem;
+  position: relative;
+  padding-right: 2.4rem;
+}
+details.question > summary::-webkit-details-marker { display: none; }
+details.question > summary::after {
+  content: "+";
+  position: absolute;
+  right: 1.2rem;
+  top: 1rem;
+  color: var(--ink-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+details.question[open] > summary::after { content: "\2212"; }
+details.question > summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+details.question .q-num {
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+details.question .q-text {
+  font-weight: 600;
+  font-size: 1.02rem;
+}
+details.question .capsule {
+  flex-basis: 100%;
+  color: var(--grade-constitutive);
+  font-size: 0.9rem;
+}
+details.question .answer {
+  padding: 0 1.2rem 1.2rem;
+}
+details.question .answer p {
+  margin: 0 0 0.9rem;
+  font-size: 0.96rem;
+}
+details.question .doors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+details.question .doors a {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+details.question .doors a:hover { border-color: var(--ink-muted); }
+
+.questions-footer {
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+  margin: 0 0 1.75rem;
+}
 
 main { display: flex; flex-direction: column; gap: 1.5rem; }
 
