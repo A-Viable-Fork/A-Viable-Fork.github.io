@@ -144,7 +144,8 @@ function el(tag, attrs, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
     if (k === "class") node.className = v;
-    else if (v !== undefined && v !== null) node.setAttribute(k, v);
+    else if (k.startsWith("on") && typeof v === "function") node.addEventListener(k.slice(2), v);
+    else if (v !== undefined && v !== null) node.setAttribute(k, v === true ? "" : v);
   }
   for (const c of children) if (c) node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
   return node;
@@ -226,14 +227,303 @@ function renderDoor(mount, project, snapshot) {
 }
 
 async function loadDoor(project, mount) {
+  if (!project) {
+    console.warn(`entrance: no project matches data-door="${mount.getAttribute("data-door")}"; leaving the section's baked markup in place`);
+    return { project: mount.getAttribute("data-door"), state: "degraded", count: 0, error: "no matching project" };
+  }
   try {
     const snapshot = await fetchSnapshot(project.snapshotUrl);
     const result = renderDoor(mount, project, snapshot);
-    return { project: project.key, snapshotUrl: project.snapshotUrl, ...result };
+    return { project: project.key, snapshotUrl: project.snapshotUrl, snapshot, ...result };
   } catch (e) {
     renderFallbackDoor(mount, project);
     console.warn(`entrance: ${project.key} degraded (${e.message})`);
     return { project: project.key, snapshotUrl: project.snapshotUrl, state: "degraded", count: 0, error: e.message };
+  }
+}
+
+// ==========================================================================================
+// The claim lens: progressive enhancement over the six-question answers' claim-spans.
+// Fetches Knowledge-Game's published front-page kernel snapshot (the fp.* claims decomposing this
+// page's own prose, plus mirrored copies of the governance claims some of them restate), verifies
+// it with the same fetchSnapshot()/hashOf() machinery the doors already use, matches each
+// `.claim-span` to its claim by exact statement-text equality (never by data-ref alone, the same
+// discipline Knowledge-Game's own root-lens.js uses), and wires tap/click to isolate the claim: its
+// statement, kind, and grade as the origin kernel's own word (never recomputed here, this repository
+// holds no kernel), the follow trail toward ground, and the typing-act doors into the app. A
+// snapshot that fails its hash check contributes nothing: spans stay plain prose, noted in the
+// console, never a broken dialog.
+// ==========================================================================================
+const FRONT_PAGE = {
+  snapshotUrl: "https://a-viable-fork.github.io/Knowledge-Game/app/fixtures/front-page.snapshot.json",
+  appBase: "https://a-viable-fork.github.io/Knowledge-Game/app/",
+  community: "front-page",
+};
+
+const ORIGIN_LABELS = {
+  "front-page": "the front page kernel (published by Knowledge-Game, this page's own decomposition)",
+  "knowledge-game": "Knowledge Game's governance kernel",
+  epistack: "epistack's self kernel",
+};
+
+const GRADE_HONESTY = {
+  constitutive: "constitutive: adopted by stipulation, not evidenced; a definition, not a measurement.",
+  asserted: "asserted: the origin kernel's own word alone so far, no independent check carried here.",
+  supported: "supported: at least one independent claim argues for this, in the origin kernel.",
+  corroborated: "corroborated: independent, disjoint support has accumulated, in the origin kernel.",
+  checked: "checked: a real, re-runnable check grounds this, in the origin kernel.",
+  "independently-rechecked": "independently rechecked: a second, independent party re-ran the check.",
+  ungraded: "ungraded.",
+};
+
+function gradeBadge(grade) {
+  return el("span", { class: `lens-badge lens-badge-grade lens-grade-${grade || "ungraded"}`, role: "img", "aria-label": `carried grade: ${grade || "ungraded"}` }, grade || "ungraded");
+}
+function kindBadge(kind) {
+  return el("span", { class: "lens-badge lens-badge-kind" }, kind);
+}
+
+function buildLensContext(snapshot, epistackSnapshot) {
+  const entries = (snapshot.state && snapshot.state.entries) || [];
+  const byStatement = new Map();
+  const byIdentity = new Map();
+  for (const e of entries) {
+    byStatement.set(e.canonical.statement, e.canonical);
+    byIdentity.set(e.identity, e.canonical);
+  }
+  const linksByFrom = new Map();
+  for (const l of (snapshot.state && snapshot.state.links) || []) {
+    if (!linksByFrom.has(l.from_identity)) linksByFrom.set(l.from_identity, []);
+    linksByFrom.get(l.from_identity).push(l);
+  }
+  const sourcesById = new Map((snapshot.sources || []).map((s) => [s.source_id, s]));
+  const epistackByIdentity = new Map();
+  if (epistackSnapshot) {
+    for (const e of (epistackSnapshot.state && epistackSnapshot.state.entries) || []) {
+      epistackByIdentity.set(e.identity, e.canonical);
+    }
+  }
+  return { byStatement, byIdentity, linksByFrom, sourcesById, epistackByIdentity, kernelId: snapshot.kernel_id };
+}
+
+function originOf(canonical, ctx) {
+  return (canonical.extensions && canonical.extensions.origin_kernel) || ctx.kernelId;
+}
+
+// the provenance chip: the claim's own source row, expandable in place, naming every sibling claim
+// in this same lens's entries that cites the identical source (the "walk outward from a source"
+// this single fetched kernel can honestly support without a second network round-trip).
+function renderProvenanceChip(canonical, ctx) {
+  const source = ctx.sourcesById.get(canonical.source_id);
+  const details = el("div", { class: "lens-provenance-detail", hidden: true });
+  const chip = el(
+    "button",
+    {
+      type: "button", class: "lens-provenance-chip", "aria-expanded": "false",
+      onclick: (e) => {
+        const open = details.hasAttribute("hidden");
+        if (open) details.removeAttribute("hidden"); else details.setAttribute("hidden", "");
+        e.currentTarget.setAttribute("aria-expanded", open ? "true" : "false");
+      },
+    },
+    `Source: ${canonical.source_id}`
+  );
+  if (source) {
+    const siblings = Array.from(ctx.byIdentity.values()).filter((c) => c.identity !== canonical.identity && c.source_id === canonical.source_id);
+    details.appendChild(el("p", { class: "lens-provenance-class" }, source.source_class));
+    details.appendChild(el("p", { class: "lens-provenance-desc" }, source.description));
+    details.appendChild(
+      siblings.length
+        ? el("p", {}, `${siblings.length} other claim${siblings.length === 1 ? "" : "s"} here cite this same source.`)
+        : el("p", {}, "no other claim here cites this source")
+    );
+  }
+  return el("div", { class: "lens-provenance" }, chip, details);
+}
+
+// the follow trail: descends from the isolated claim toward ground. At most one of: an outgoing
+// restatement link (resolved first within this same front-page snapshot, then, if absent there, as
+// a crossing into the already-fetched epistack snapshot, marked as a crossing), a `url` extension
+// (an artifact door, honestly labeled as leaving the lens), or neither (grounded by adoption alone).
+function renderFollow(canonical, ctx) {
+  const outgoing = (ctx.linksByFrom.get(canonical.identity) || []).find((l) => l.link_kind === "restatement");
+  const contradicts = (ctx.linksByFrom.get(canonical.identity) || []).filter((l) => l.link_kind === "contradicts");
+  const hops = [
+    el(
+      "div",
+      { class: "lens-hop lens-hop-current" },
+      el("p", { class: "lens-hop-label" }, "This claim"),
+      el("p", {}, canonical.statement),
+      gradeBadge(canonical.declared_grade),
+      renderProvenanceChip(canonical, ctx)
+    ),
+  ];
+
+  if (outgoing) {
+    let target = ctx.byIdentity.get(outgoing.to_identity);
+    let crossing = false;
+    if (!target && ctx.epistackByIdentity.has(outgoing.to_identity)) {
+      target = ctx.epistackByIdentity.get(outgoing.to_identity);
+      crossing = true;
+    }
+    if (target) {
+      hops.push(
+        el(
+          "div",
+          { class: `lens-hop ${crossing ? "lens-hop-cross-kernel" : ""}` },
+          el("p", { class: "lens-hop-label" }, crossing ? "Crossing: leaving the front-page kernel into epistack's own published snapshot" : `Restated from ${ORIGIN_LABELS[originOf(target, ctx)] || originOf(target, ctx)}`),
+          el("p", {}, target.statement),
+          gradeBadge(target.declared_grade),
+          renderProvenanceChip(target, ctx)
+        )
+      );
+    } else {
+      hops.push(el("div", { class: "lens-hop lens-hop-end" }, el("p", { class: "lens-hop-label" }, "Restates a claim absent from every snapshot this lens loaded; unresolved, not hidden.")));
+    }
+  } else if (canonical.extensions && canonical.extensions.url) {
+    hops.push(
+      el(
+        "div",
+        { class: "lens-hop lens-hop-door" },
+        el("p", { class: "lens-hop-label" }, "Leaving the lens: this claim's provenance lives outside any fetched snapshot."),
+        el("a", { class: "lens-door-link", href: canonical.extensions.url, target: "_blank", rel: "noopener" }, canonical.extensions.url)
+      )
+    );
+  } else {
+    hops.push(el("div", { class: "lens-hop lens-hop-end" }, el("p", { class: "lens-hop-label" }, "Grounded by adoption alone: no further citation to follow.")));
+  }
+
+  for (const link of contradicts) {
+    const target = ctx.byIdentity.get(link.to_identity);
+    if (target) hops.push(el("div", { class: "lens-hop lens-hop-contradicts" }, el("p", { class: "lens-hop-label" }, "Contradicts"), el("p", {}, target.statement), gradeBadge(target.declared_grade)));
+  }
+
+  return el("div", { class: "lens-follow" }, ...hops);
+}
+
+// the typing-act doors: real deep links into the app's own compose surface for the identical
+// registered community ("front-page") this lens reads, carrying the claim's identity as the target.
+// Attest and decompose carry no dedicated compose shape anywhere in the app yet, so both land as
+// honestly labeled doors into the claim's own card rather than a pre-fill that does not exist.
+function composeHref(action, identity) {
+  return `${FRONT_PAGE.appBase}#community=${FRONT_PAGE.community}&view=contribute&action=${action}&target=${encodeURIComponent(identity)}`;
+}
+function cardHref(identity) {
+  return `${FRONT_PAGE.appBase}#community=${FRONT_PAGE.community}&claim=${encodeURIComponent(identity)}`;
+}
+
+function renderActionSheet(canonical, state) {
+  const followBtn = el(
+    "button",
+    { type: "button", class: "lens-action lens-action-read", "aria-pressed": state.followOpen ? "true" : "false", onclick: () => { state.followOpen = !state.followOpen; state.rerender(); } },
+    state.followOpen ? "Hide follow" : "Follow"
+  );
+  const gatedActions = [
+    el("a", { class: "lens-action lens-action-gated", href: composeHref("comment", canonical.identity) }, "Comment (through the gate)"),
+    el("a", { class: "lens-action lens-action-gated", href: composeHref("fork", canonical.identity) }, "Fork this type (through the gate)"),
+    el("a", { class: "lens-action lens-action-gated", href: composeHref("contest", canonical.identity) }, "Contest this claim's type (through the gate; admitting a contest moves no existing grade)"),
+    el("a", { class: "lens-action lens-action-door", href: cardHref(canonical.identity) }, "Attest (opens this claim's card in the app; no dedicated attest shape exists yet)"),
+    el("a", { class: "lens-action lens-action-door", href: cardHref(canonical.identity) }, "Decompose (opens this claim's card in the app; no dedicated decompose shape exists yet)"),
+  ];
+  return el("div", { class: "lens-actions" }, el("div", { class: "lens-actions-read" }, followBtn), el("div", { class: "lens-actions-gated" }, ...gatedActions));
+}
+
+function renderPanel(canonical, ctx, state) {
+  return el(
+    "div",
+    { class: "lens-panel", role: "dialog", "aria-modal": "true", "aria-labelledby": "lens-panel-title", tabindex: "-1" },
+    el("button", { type: "button", class: "lens-close", "aria-label": "Close, restore reading", onclick: () => ctx.close() }, "×"),
+    el("p", { id: "lens-panel-title", class: "lens-panel-kind-line" }, kindBadge(canonical.kind), gradeBadge(canonical.declared_grade)),
+    el("p", { class: "lens-panel-statement" }, canonical.statement),
+    el("p", { class: "lens-panel-origin" }, `Carried from ${ORIGIN_LABELS[originOf(canonical, ctx)] || originOf(canonical, ctx)}.`),
+    el("p", { class: "lens-panel-honesty" }, `${GRADE_HONESTY[canonical.declared_grade] || GRADE_HONESTY.ungraded} Standing does not transfer across kernels; reading requires nothing.`),
+    renderActionSheet(canonical, state),
+    state.followOpen ? renderFollow(canonical, ctx) : null
+  );
+}
+
+function wireLens(ctx) {
+  const scrim = el("div", { class: "lens-scrim", hidden: true });
+  document.body.appendChild(scrim);
+  let openSpan = null;
+  const state = { followOpen: false, rerender: () => rerenderOpen() };
+
+  function close() {
+    scrim.setAttribute("hidden", "");
+    scrim.innerHTML = "";
+    document.body.classList.remove("lens-open");
+    if (openSpan) { openSpan.classList.remove("claim-span-open"); openSpan.focus({ preventScroll: true }); }
+    openSpan = null;
+    state.followOpen = false;
+    window.removeEventListener("keydown", onKeydown);
+    window.removeEventListener("scroll", onScroll, true);
+  }
+  ctx.close = close;
+
+  function rerenderOpen() {
+    if (!openSpan) return;
+    const canonical = ctx.byStatement.get(openSpan.textContent);
+    if (!canonical) return;
+    scrim.innerHTML = "";
+    const panel = renderPanel(canonical, ctx, state);
+    scrim.appendChild(panel);
+    panel.focus();
+  }
+
+  function onKeydown(e) {
+    if (e.key === "Escape") close();
+  }
+  let openScrollY = 0;
+  function onScroll() {
+    if (Math.abs(window.scrollY - openScrollY) > 240) close();
+  }
+
+  function open(span) {
+    const canonical = ctx.byStatement.get(span.textContent);
+    if (!canonical) return; // unresolved span: no claim to open, prose stays plain
+    if (openSpan) close();
+    openSpan = span;
+    openSpan.classList.add("claim-span-open");
+    document.body.classList.add("lens-open");
+    scrim.removeAttribute("hidden");
+    openScrollY = window.scrollY;
+    rerenderOpen();
+    window.addEventListener("keydown", onKeydown);
+    window.addEventListener("scroll", onScroll, true);
+  }
+
+  scrim.addEventListener("click", (e) => { if (e.target === scrim) close(); });
+
+  const spans = document.querySelectorAll(".claim-span");
+  let wired = 0;
+  for (const span of spans) {
+    if (!ctx.byStatement.has(span.textContent)) {
+      console.warn(`entrance: claim-span "${span.getAttribute("data-ref")}" has no matching statement in the front-page snapshot; left as plain prose`);
+      continue;
+    }
+    span.setAttribute("tabindex", "0");
+    span.setAttribute("role", "button");
+    span.classList.add("claim-span-live");
+    span.addEventListener("click", () => open(span));
+    span.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(span); } });
+    wired++;
+  }
+  return wired;
+}
+
+async function loadLens(epistackSnapshot) {
+  const spans = document.querySelectorAll(".claim-span");
+  if (!spans.length) return { state: "no-spans", wired: 0 };
+  try {
+    const snapshot = await fetchSnapshot(FRONT_PAGE.snapshotUrl);
+    const ctx = buildLensContext(snapshot, epistackSnapshot);
+    const wired = wireLens(ctx);
+    return { state: "live", wired, total: spans.length, snapshotUrl: FRONT_PAGE.snapshotUrl };
+  } catch (e) {
+    // progressive enhancement: a fetch or hash-verification failure leaves every span as plain
+    // prose, exactly as it renders with this script absent, never a broken half-state.
+    console.warn(`entrance: claim lens degraded (${e.message}); spans remain plain prose`);
+    return { state: "degraded", wired: 0, total: spans.length, error: e.message };
   }
 }
 
@@ -249,6 +539,9 @@ async function main() {
   ]);
   window.__entranceDoors = results; // inspectable from the console for the degrade test
   window.__entranceFrame = frameResult;
+
+  const epistackResult = results.find((r) => r.project === "epistack");
+  window.__entranceLens = await loadLens(epistackResult && epistackResult.snapshot);
 }
 
 main();
