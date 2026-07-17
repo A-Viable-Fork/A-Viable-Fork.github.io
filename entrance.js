@@ -80,6 +80,55 @@ const PROJECTS = [
   },
 ];
 
+// ---- the frame line: the org-root entrance's orienting sentence, fetched from the minimum
+//   constitution's own opening rather than authored here. The fallback below is baked only as the
+//   degrade text; it is the constitution's own first sentence, verbatim, so a fetch failure changes
+//   nothing the reader sees except staleness. No rendered docs site exists yet (epistack's Pages
+//   workflow only publishes self.snapshot.json), so this fetches the raw markdown source and parses
+//   just the opening sentence: strip the frontmatter block, strip the heading line, take the first
+//   paragraph's first sentence. This is a small, fixed slice, not the kind of full-document markdown
+//   parse a prior session flagged as fragile for locating a named subsection deep in a long document.
+const CONSTITUTION = {
+  rawUrl: "https://raw.githubusercontent.com/A-Viable-Fork/epistack/main/docs/the-minimum-constitution.md",
+  linkUrl: "https://github.com/A-Viable-Fork/epistack/blob/main/docs/the-minimum-constitution.md",
+  fallbackLine: "EpiStack is a minimal shared structure on which independent communities build knowledge that composes.",
+};
+
+function stripMarkdownInline(s) {
+  return s
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/`([^`]+)`/g, "$1");
+}
+
+// pulls the first sentence of the first paragraph after the frontmatter and the '# ' heading.
+function extractOpeningSentence(markdown) {
+  let text = markdown.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "");
+  text = text.replace(/^\s*\n+/, "").replace(/^#[^\n]*\n/, "").trim();
+  const paragraphEnd = text.search(/\n\s*\n/);
+  const firstParagraph = stripMarkdownInline((paragraphEnd === -1 ? text : text.slice(0, paragraphEnd)).replace(/\s+/g, " ").trim());
+  const m = /^.*?[.!?](?=\s|$)/.exec(firstParagraph);
+  return m ? m[0].trim() : null;
+}
+
+async function loadFrameLine(mount) {
+  if (!mount) return { state: "degraded", line: CONSTITUTION.fallbackLine, error: "no mount" };
+  try {
+    const res = await fetch(CONSTITUTION.rawUrl, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const sentence = extractOpeningSentence(text);
+    if (!sentence) throw new Error("could not parse an opening sentence");
+    mount.textContent = sentence;
+    return { state: "live", line: sentence };
+  } catch (e) {
+    // mount already carries the baked fallback line from the HTML; leave it untouched.
+    console.warn(`entrance: constitution frame line degraded (${e.message})`);
+    return { state: "degraded", line: mount.textContent, error: e.message };
+  }
+}
+
 async function fetchSnapshot(url) {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -190,13 +239,16 @@ async function loadDoor(project, mount) {
 
 async function main() {
   const mounts = document.querySelectorAll("[data-door]");
-  const results = await Promise.all(
-    Array.from(mounts).map((mount) => {
+  const frameMount = document.getElementById("frame-line");
+  const [frameResult, ...results] = await Promise.all([
+    loadFrameLine(frameMount),
+    ...Array.from(mounts).map((mount) => {
       const project = PROJECTS.find((p) => p.key === mount.getAttribute("data-door"));
       return loadDoor(project, mount);
-    })
-  );
+    }),
+  ]);
   window.__entranceDoors = results; // inspectable from the console for the degrade test
+  window.__entranceFrame = frameResult;
 }
 
 main();

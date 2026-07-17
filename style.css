@@ -65,6 +65,20 @@ header.entrance-header p {
   font-size: 1rem;
 }
 
+.start-here {
+  margin: 0 0 1.75rem;
+}
+.start-here a {
+  display: inline-block;
+  border: 1px solid var(--grade-constitutive);
+  border-radius: 999px;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+.start-here a:hover { background: color-mix(in srgb, var(--grade-constitutive) 10%, transparent); }
+.start-here strong { color: var(--grade-constitutive); }
+
 main { display: flex; flex-direction: column; gap: 1.5rem; }
 
 .door {
@@ -154,7 +168,8 @@ section.readers {
   padding-top: 1.5rem;
   margin-top: 0.5rem;
 }
-section.readers h2 { font-size: 1.05rem; margin: 0 0 0.8rem; }
+section.readers h2 { font-size: 1.05rem; margin: 0 0 0.4rem; }
+section.readers .frame-connective { color: var(--ink-muted); font-size: 0.88rem; margin: 0 0 0.9rem; }
 section.readers .path { margin-bottom: 0.9rem; }
 section.readers .path h3 { font-size: 0.95rem; margin: 0 0 0.2rem; }
 section.readers .path p { margin: 0; color: var(--ink-muted); font-size: 0.92rem; }
