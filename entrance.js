@@ -244,24 +244,27 @@ async function loadDoor(project, mount) {
 
 // ==========================================================================================
 // The claim lens: progressive enhancement over the six-question answers' claim-spans.
-// Fetches Knowledge-Game's published front-page kernel snapshot (the fp.* claims decomposing this
-// page's own prose, plus mirrored copies of the governance claims some of them restate), verifies
-// it with the same fetchSnapshot()/hashOf() machinery the doors already use, matches each
-// `.claim-span` to its claim by exact statement-text equality (never by data-ref alone, the same
-// discipline Knowledge-Game's own root-lens.js uses), and wires tap/click to isolate the claim: its
-// statement, kind, and grade as the origin kernel's own word (never recomputed here, this repository
-// holds no kernel), the follow trail toward ground, and the typing-act doors into the app. A
-// snapshot that fails its hash check contributes nothing: spans stay plain prose, noted in the
-// console, never a broken dialog.
+// Reads the fp.* claims from the same Knowledge-Game governance snapshot the Knowledge Game door
+// already fetches and hash-verifies (one fetch, one verification, shared with the door; no second
+// snapshot). A page span binds to its claim by a two-key rule, successor to this file's original
+// "never by data-ref alone" discipline now that Knowledge-Game's own convention gives data-ref a
+// stable, build-time-independent meaning: IDENTITY is by span_ref (the claim whose `span_ref`
+// extension equals the span's `data-ref`; this is what finds the claim), and HONESTY is by text
+// (the claim's statement must equal the span's own text exactly; a mismatch degrades that span to
+// plain prose with a console warning naming the ref and the two texts' first divergence). Ref
+// matching alone would let a future page edit silently wear a claim's grade over drifted words;
+// the text check keeps that impossible. Wires tap/click on a resolved span to isolate the claim:
+// its statement, kind, and grade as the origin kernel's own word (never recomputed here, this
+// repository holds no kernel), the follow trail toward ground, and the typing-act doors into the
+// app. A snapshot that fails its hash check contributes nothing: spans stay plain prose, noted in
+// the console, never a broken dialog.
 // ==========================================================================================
 const FRONT_PAGE = {
-  snapshotUrl: "https://a-viable-fork.github.io/Knowledge-Game/app/fixtures/front-page.snapshot.json",
   appBase: "https://a-viable-fork.github.io/Knowledge-Game/app/",
-  community: "front-page",
+  community: "knowledge-game",
 };
 
 const ORIGIN_LABELS = {
-  "front-page": "the front page kernel (published by Knowledge-Game, this page's own decomposition)",
   "knowledge-game": "Knowledge Game's governance kernel",
   epistack: "epistack's self kernel",
 };
@@ -283,13 +286,22 @@ function kindBadge(kind) {
   return el("span", { class: "lens-badge lens-badge-kind" }, kind);
 }
 
+// the first index at which two strings differ (or the shorter string's length, if one is a
+// prefix of the other), used only to name a drift warning's divergence point.
+function firstDivergence(a, b) {
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i++) if (a[i] !== b[i]) return i;
+  return n;
+}
+
 function buildLensContext(snapshot, epistackSnapshot) {
   const entries = (snapshot.state && snapshot.state.entries) || [];
-  const byStatement = new Map();
   const byIdentity = new Map();
+  const bySpanRef = new Map();
   for (const e of entries) {
-    byStatement.set(e.canonical.statement, e.canonical);
     byIdentity.set(e.identity, e.canonical);
+    const spanRef = e.canonical.extensions && e.canonical.extensions.span_ref;
+    if (spanRef) bySpanRef.set(spanRef, e.canonical);
   }
   const linksByFrom = new Map();
   for (const l of (snapshot.state && snapshot.state.links) || []) {
@@ -303,7 +315,7 @@ function buildLensContext(snapshot, epistackSnapshot) {
       epistackByIdentity.set(e.identity, e.canonical);
     }
   }
-  return { byStatement, byIdentity, linksByFrom, sourcesById, epistackByIdentity, kernelId: snapshot.kernel_id };
+  return { byIdentity, bySpanRef, linksByFrom, sourcesById, epistackByIdentity, kernelId: snapshot.kernel_id };
 }
 
 function originOf(canonical, ctx) {
@@ -342,9 +354,10 @@ function renderProvenanceChip(canonical, ctx) {
 }
 
 // the follow trail: descends from the isolated claim toward ground. At most one of: an outgoing
-// restatement link (resolved first within this same front-page snapshot, then, if absent there, as
-// a crossing into the already-fetched epistack snapshot, marked as a crossing), a `url` extension
-// (an artifact door, honestly labeled as leaving the lens), or neither (grounded by adoption alone).
+// restatement link (resolved first within this same Knowledge-Game snapshot, then, if absent
+// there, as a crossing into the already-fetched epistack snapshot, marked as a crossing), a `url`
+// extension (an artifact door, honestly labeled as leaving the lens), or neither (grounded by
+// adoption alone).
 function renderFollow(canonical, ctx) {
   const outgoing = (ctx.linksByFrom.get(canonical.identity) || []).find((l) => l.link_kind === "restatement");
   const contradicts = (ctx.linksByFrom.get(canonical.identity) || []).filter((l) => l.link_kind === "contradicts");
@@ -371,7 +384,7 @@ function renderFollow(canonical, ctx) {
         el(
           "div",
           { class: `lens-hop ${crossing ? "lens-hop-cross-kernel" : ""}` },
-          el("p", { class: "lens-hop-label" }, crossing ? "Crossing: leaving the front-page kernel into epistack's own published snapshot" : `Restated from ${ORIGIN_LABELS[originOf(target, ctx)] || originOf(target, ctx)}`),
+          el("p", { class: "lens-hop-label" }, crossing ? "Crossing: leaving Knowledge Game's kernel into epistack's own published snapshot" : `Restated from ${ORIGIN_LABELS[originOf(target, ctx)] || originOf(target, ctx)}`),
           el("p", {}, target.statement),
           gradeBadge(target.declared_grade),
           renderProvenanceChip(target, ctx)
@@ -402,9 +415,10 @@ function renderFollow(canonical, ctx) {
 }
 
 // the typing-act doors: real deep links into the app's own compose surface for the identical
-// registered community ("front-page") this lens reads, carrying the claim's identity as the target.
-// Attest and decompose carry no dedicated compose shape anywhere in the app yet, so both land as
-// honestly labeled doors into the claim's own card rather than a pre-fill that does not exist.
+// registered community ("knowledge-game") this lens reads, carrying the claim's identity as the
+// target. Attest and decompose carry no dedicated compose shape anywhere in the app yet, so both
+// land as honestly labeled doors into the claim's own card rather than a pre-fill that does not
+// exist.
 function composeHref(action, identity) {
   return `${FRONT_PAGE.appBase}#community=${FRONT_PAGE.community}&view=contribute&action=${action}&target=${encodeURIComponent(identity)}`;
 }
@@ -462,7 +476,7 @@ function wireLens(ctx) {
 
   function rerenderOpen() {
     if (!openSpan) return;
-    const canonical = ctx.byStatement.get(openSpan.textContent);
+    const canonical = ctx.bySpanRef.get(openSpan.getAttribute("data-ref"));
     if (!canonical) return;
     scrim.innerHTML = "";
     const panel = renderPanel(canonical, ctx, state);
@@ -479,7 +493,7 @@ function wireLens(ctx) {
   }
 
   function open(span) {
-    const canonical = ctx.byStatement.get(span.textContent);
+    const canonical = ctx.bySpanRef.get(span.getAttribute("data-ref"));
     if (!canonical) return; // unresolved span: no claim to open, prose stays plain
     if (openSpan) close();
     openSpan = span;
@@ -497,8 +511,19 @@ function wireLens(ctx) {
   const spans = document.querySelectorAll(".claim-span");
   let wired = 0;
   for (const span of spans) {
-    if (!ctx.byStatement.has(span.textContent)) {
-      console.warn(`entrance: claim-span "${span.getAttribute("data-ref")}" has no matching statement in the front-page snapshot; left as plain prose`);
+    const ref = span.getAttribute("data-ref");
+    const canonical = ctx.bySpanRef.get(ref);
+    if (!canonical) {
+      console.warn(`entrance: claim-span "${ref}" has no matching span_ref in the governance snapshot; left as plain prose`);
+      continue;
+    }
+    if (canonical.statement !== span.textContent) {
+      const at = firstDivergence(canonical.statement, span.textContent);
+      console.warn(
+        `entrance: claim-span "${ref}" text has drifted from its claim's statement, first divergence at character ${at}` +
+        ` (page: "...${span.textContent.slice(Math.max(0, at - 10), at + 30)}...", claim: "...${canonical.statement.slice(Math.max(0, at - 10), at + 30)}...");` +
+        ` left as plain prose`
+      );
       continue;
     }
     span.setAttribute("tabindex", "0");
@@ -511,20 +536,20 @@ function wireLens(ctx) {
   return wired;
 }
 
-async function loadLens(epistackSnapshot) {
+// no fetch of its own: the lens reads the Knowledge Game door's already-fetched, already-hash-
+// verified snapshot. A door that degraded (fetch failure or hash mismatch) carries no `snapshot`
+// in its result, so the lens degrades identically and for the identical reason; a corrupted local
+// copy contributes nothing to either the door or the lens.
+function loadLens(kgSnapshot, kgSnapshotUrl, epistackSnapshot) {
   const spans = document.querySelectorAll(".claim-span");
   if (!spans.length) return { state: "no-spans", wired: 0 };
-  try {
-    const snapshot = await fetchSnapshot(FRONT_PAGE.snapshotUrl);
-    const ctx = buildLensContext(snapshot, epistackSnapshot);
-    const wired = wireLens(ctx);
-    return { state: "live", wired, total: spans.length, snapshotUrl: FRONT_PAGE.snapshotUrl };
-  } catch (e) {
-    // progressive enhancement: a fetch or hash-verification failure leaves every span as plain
-    // prose, exactly as it renders with this script absent, never a broken half-state.
-    console.warn(`entrance: claim lens degraded (${e.message}); spans remain plain prose`);
-    return { state: "degraded", wired: 0, total: spans.length, error: e.message };
+  if (!kgSnapshot) {
+    console.warn(`entrance: claim lens degraded (Knowledge Game snapshot unavailable); spans remain plain prose`);
+    return { state: "degraded", wired: 0, total: spans.length, error: "knowledge-game snapshot unavailable" };
   }
+  const ctx = buildLensContext(kgSnapshot, epistackSnapshot);
+  const wired = wireLens(ctx);
+  return { state: "live", wired, total: spans.length, snapshotUrl: kgSnapshotUrl };
 }
 
 async function main() {
@@ -540,8 +565,9 @@ async function main() {
   window.__entranceDoors = results; // inspectable from the console for the degrade test
   window.__entranceFrame = frameResult;
 
+  const kgResult = results.find((r) => r.project === "knowledge-game");
   const epistackResult = results.find((r) => r.project === "epistack");
-  window.__entranceLens = await loadLens(epistackResult && epistackResult.snapshot);
+  window.__entranceLens = loadLens(kgResult && kgResult.snapshot, kgResult && kgResult.snapshotUrl, epistackResult && epistackResult.snapshot);
 }
 
 main();
