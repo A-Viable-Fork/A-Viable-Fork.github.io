@@ -81,6 +81,16 @@ header.entrance-header p {
 }
 .primary-action a:hover { opacity: 0.9; }
 
+.judges-line {
+  font-size: 0.92rem;
+  margin: 0 0 1.25rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+}
+.judges-line strong { color: var(--grade-constitutive); }
+
 .branch-intro {
   color: var(--ink-muted);
   font-size: 0.9rem;
