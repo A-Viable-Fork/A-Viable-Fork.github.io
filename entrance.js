@@ -67,16 +67,16 @@ async function hashOf(value) {
 // ---- the two projects this entrance surfaces ----
 const PROJECTS = [
   {
-    key: "knowledge-game",
-    fallbackName: "The Knowledge Game",
-    repoUrl: "https://github.com/A-Viable-Fork/Knowledge-Game",
-    snapshotUrl: "https://a-viable-fork.github.io/Knowledge-Game/app/fixtures/knowledge-game.snapshot.json",
-  },
-  {
     key: "epistack",
     fallbackName: "EpiStack",
     repoUrl: "https://github.com/A-Viable-Fork/epistack",
     snapshotUrl: "https://a-viable-fork.github.io/epistack/self.snapshot.json",
+  },
+  {
+    key: "knowledge-game",
+    fallbackName: "The Knowledge Game",
+    repoUrl: "https://github.com/A-Viable-Fork/Knowledge-Game",
+    snapshotUrl: "https://a-viable-fork.github.io/Knowledge-Game/app/fixtures/knowledge-game.snapshot.json",
   },
 ];
 
